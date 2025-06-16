@@ -9,6 +9,13 @@ import {
   Dimensions,
 } from "react-native";
 import Header from "../components/Header";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withDecay,
+} from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 type Artwork = {
   image: any;
@@ -23,6 +30,30 @@ const artworks = [
     title: "Linnahall",
     price: "$100",
     description: "A view of the iconic Linnahall in Tallinn.",
+  },
+    {
+    image: require("../assets/Tree.jpg"),
+    title: "Tree",
+    price: "$100",
+    description: "Late Summer in Estonia",
+  },
+    {
+    image: require("../assets/Flyer.jpg"),
+    title: "Flyer",
+    price: "$100",
+    description: "Contemporary Street Art in Berlin",
+  },
+    {
+    image: require("../assets/Trashcan.jpg"),
+    title: "Trashcan",
+    price: "$100",
+    description: "A joking trashcan in Berlin.",
+  },
+    {
+    image: require("../assets/Lotus.jpg"),
+    title: "Lotus",
+    price: "$100",
+    description: "Botanical Garten Lotus with Moss",
   },
   {
     image: require("../assets/workshop.jpg"),
@@ -39,42 +70,35 @@ const artworks = [
   {
     image: require("../assets/memorial.jpg"),
     title: "Jewish Memorial",
-    price: "$100",
+    price: "$80",
     description: "A moving tribute at the Jewish Memorial.",
   },
   {
     image: require("../assets/zebra.jpg"),
     title: "Nightwalk in Berlin",
-    price: "$100",
-    description: "Crossing streets in Late Night Berlin.",
+    price: "$90",
+    description: "A zebra crossing at night in Berlin.",
   },
 ];
 
 const IMAGE_SIZE = 250;
-const MIN_DISTANCE = 150
+const MIN_DISTANCE = 400;
+const GRID_COLS = 6; // Number of columns in the grid
 
-function generateRandomPositions(count: number, width: number, height: number) {
-  const DEADZONE_BOTTOM = 80; // px to keep images above the bottom
-  const DEADZONE_TOP = 100;   // already used for header
+function generateScatteredGridPositions(count: number, imageSize: number, minDistance: number, cols: number) {
   const positions: { left: number; top: number }[] = [];
-  let attempts = 0;
-  while (positions.length < count && attempts < 1000) {
-    const left = Math.random() * (width - IMAGE_SIZE);
-    const top = Math.random() * (height - IMAGE_SIZE - DEADZONE_BOTTOM - DEADZONE_TOP) + DEADZONE_TOP;
-    // Check minimum distance
-    let tooClose = false;
-    for (const pos of positions) {
-      const dx = pos.left - left;
-      const dy = pos.top - top;
-      if (Math.sqrt(dx * dx + dy * dy) < IMAGE_SIZE + MIN_DISTANCE) {
-        tooClose = true;
-        break;
-      }
-    }
-    if (!tooClose) {
-      positions.push({ left, top });
-    }
-    attempts++;
+  const spacing = imageSize + minDistance;
+  const rows = Math.ceil(count / cols);
+  for (let i = 0; i < count; i++) {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    // Add a small offset for a scattered look
+    const offsetX = ((i % 2 === 0 ? 1 : -1) * (minDistance * 0.3));
+    const offsetY = ((i % 3 === 0 ? 1 : -1) * (minDistance * 0.2));
+    positions.push({
+      left: col * spacing + offsetX,
+      top: row * spacing + offsetY,
+    });
   }
   return positions;
 }
@@ -83,28 +107,71 @@ export default function Gallery() {
   const [selectedArt, setSelectedArt] = useState<Artwork | null>(null);
   const [positions, setPositions] = useState<{ left: number; top: number }[]>([]);
 
+  // Calculate canvas size based on grid
+  const cols = GRID_COLS;
+  const rows = Math.ceil(artworks.length / cols);
+  const CANVAS_WIDTH = cols * (IMAGE_SIZE + MIN_DISTANCE);
+  const CANVAS_HEIGHT = rows * (IMAGE_SIZE + MIN_DISTANCE);
+
+  // Pan state
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const panStartX = useSharedValue(0);
+  const panStartY = useSharedValue(0);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+    ],
+  }));
+
+  // Use new Gesture API
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      panStartX.value = translateX.value;
+      panStartY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      translateX.value = panStartX.value + event.translationX;
+      translateY.value = panStartY.value + event.translationY;
+    })
+    .onEnd((event) => {
+      translateX.value = withDecay({ velocity: event.velocityX });
+      translateY.value = withDecay({ velocity: event.velocityY });
+    });
+
   useEffect(() => {
+    setPositions(generateScatteredGridPositions(artworks.length, IMAGE_SIZE, MIN_DISTANCE, GRID_COLS));
+    // Center the canvas in the viewport
     const { width, height } = Dimensions.get("window");
-    setPositions(generateRandomPositions(artworks.length, width, height));
+    translateX.value = (width - CANVAS_WIDTH) / 2;
+    translateY.value = (height - CANVAS_HEIGHT) / 2;
   }, []);
 
   return (
     <View style={styles.container}>
       <Header />
-      <View style={styles.scatterContainer}>
-        {artworks.map((art, index) => (
-          <TouchableOpacity
-            key={index}
-            onPress={() => setSelectedArt(art)}
-            style={[
-              styles.artImageWrapper,
-              positions[index] ? { left: positions[index].left, top: positions[index].top } : {},
-            ]}
-          >
-            <Image source={art.image} style={styles.artImage} />
-          </TouchableOpacity>
-        ))}
-      </View>
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={{ flex: 1 }} pointerEvents="box-none">
+          <View style={styles.viewport}>
+            <Animated.View style={[styles.scatterContainer, { width: CANVAS_WIDTH, height: CANVAS_HEIGHT }, animatedStyle]} pointerEvents="box-none">
+              {artworks.map((art, index) => (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => setSelectedArt(art)}
+                  style={[
+                    styles.artImageWrapper,
+                    positions[index] ? { left: positions[index].left, top: positions[index].top } : {},
+                  ]}
+                >
+                  <Image source={art.image} style={styles.artImage} />
+                </TouchableOpacity>
+              ))}
+            </Animated.View>
+          </View>
+        </Animated.View>
+      </GestureDetector>
       {/* Zoom Modal */}
       <Modal visible={selectedArt !== null} transparent animationType="fade">
         <View style={styles.modalOverlay}>
@@ -131,9 +198,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#3e3e3e",
     padding: 0,
   },
-  scatterContainer: {
+  viewport: {
     flex: 1,
-    position: "relative",
+    overflow: 'hidden',
+  },
+  scatterContainer: {
+    // position: "relative" is default, so just remove position property
+    // width and height set dynamically
   },
   artImageWrapper: {
     position: "absolute",

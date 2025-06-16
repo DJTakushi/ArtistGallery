@@ -3,11 +3,9 @@ import { Text, View, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { useLanguage } from '../components/LanguageContext';
 import LanguageSwitch from '../components/language';
 import Header from '../components/Header';
-import i18n from '../i18n';
 
 export default function Home() {
   const { locale } = useLanguage();
-  i18n
 
 return (
   <View style={styles.screen}>
@@ -21,13 +19,12 @@ return (
 
       {/* Right Pane - Content */}
       <View style={styles.rightPane}>
-        <Text style={styles.rightVerticalText}>Creative Studio Roche{"\n\n"}</Text>
-        <Text style={styles.paragraph}>{i18n.t('home_paragraph')}</Text>
+        <Text style={styles.rightVerticalText}>Creative Studio Roche</Text>
         <Text style={styles.author}>by Andre Meow and Danny Takushi</Text>
         <Text style={styles.paragraph}>Great Art and Cat Pictures</Text>
 
         <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Contact</Text>
+          <Text style={styles.buttonText}>Concept</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -89,8 +86,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   paragraph: {
-    fontSize: 22,
-    fontStyle: 'italic',
+    fontSize: 14,
     color: '#333',
     marginBottom: 25,
     lineHeight: 20,
