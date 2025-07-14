@@ -81,7 +81,7 @@ const artworks = [
   },
 ];
 
-const IMAGE_SIZE = 500;
+const IMAGE_SIZE = 600;
 const MIN_DISTANCE = 400;
 const GRID_COLS = 3; // Number of columns in the grid
 
